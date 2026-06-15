@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* optional small theme tweaks */
+:root {
+  --brand-500: #6366f1;
+}
