@@ -1,4 +1,7 @@
 export async function encryptFile(file, password) {
+  // Generate a cryptographically random salt for each encryption
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+
   const keyMaterial = await window.crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -10,7 +13,7 @@ export async function encryptFile(file, password) {
   const key = await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: new TextEncoder().encode("my-salt"),
+      salt: salt,
       iterations: 100000,
       hash: "SHA-256",
     },
@@ -30,13 +33,17 @@ export async function encryptFile(file, password) {
     await file.arrayBuffer()
   );
 
-  return new Blob([iv, new Uint8Array(encrypted)]);
+  // Store salt + iv + ciphertext so decryption can recover the key
+  return new Blob([salt, iv, new Uint8Array(encrypted)]);
 }
 
 export async function decryptFile(blob, password) {
   const array = new Uint8Array(await blob.arrayBuffer());
-  const iv = array.slice(0, 12);
-  const encrypted = array.slice(12);
+
+  // Extract salt (first 16 bytes), iv (next 12 bytes), and ciphertext
+  const salt = array.slice(0, 16);
+  const iv = array.slice(16, 28);
+  const encrypted = array.slice(28);
 
   const keyMaterial = await window.crypto.subtle.importKey(
     "raw",
@@ -49,7 +56,7 @@ export async function decryptFile(blob, password) {
   const key = await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: new TextEncoder().encode("my-salt"),
+      salt: salt,
       iterations: 100000,
       hash: "SHA-256",
     },
