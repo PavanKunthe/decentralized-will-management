@@ -80,6 +80,15 @@ A decentralized digital inheritance system built on Ethereum that enables secure
 ### Dead Man's Switch — Countdown Timer
 ![Dead Man's Switch with countdown timer and locker details](screenshots/deadman-switch.png)
 
+### Will Expired — Death Certificate Required
+![Expired will requiring death certificate upload](screenshots/expired-certificate-required.png)
+
+### Certificate Verification — OCR & SHA-256 Hashing
+![Backend OCR validation with hash and confidence score](screenshots/certificate-ocr-validation.png)
+
+### Claim & Decrypt Will
+![Beneficiary claims will, loads CID, and decrypts the document](screenshots/claim-and-decrypt.png)
+
 ### Infrastructure — Local Development
 ![Hardhat local blockchain running with test accounts](screenshots/hardhat-node.png)
 ![Smart contract deployment to local network](screenshots/contract-deployment.png)
