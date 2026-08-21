@@ -1,7 +1,7 @@
 {
   "name": "decentralized-will",
   "version": "1.0.0",
-  "description": "This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.",
+  "description": "Blockchain-based decentralized will management system with Dead Man's Switch, IPFS storage, and client-side encryption.",
   "main": "hardhat.config.js",
   "directories": {
     "test": "test"

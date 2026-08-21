@@ -1,333 +1,239 @@
-# Decentralized Will Management System
+# Blockchain-Based Decentralized Will Management
 
-A blockchain-based decentralized application (dApp) that enables secure will management with automated inheritance distribution. The system features a "Dead Man's Switch" mechanism with death certificate verification, ensuring wills are only released to designated beneficiaries after proper validation.
+A decentralized digital inheritance system built on Ethereum that enables secure will creation, encrypted document storage on IPFS, and automated beneficiary claim workflows — powered by Solidity smart contracts with a Dead Man's Switch mechanism.
 
-## 🌟 Features
+## Key Features
 
-### Core Functionality
-- **Encrypted Will Storage**: Upload and encrypt PDF wills stored on IPFS via Pinata
-- **Dead Man's Switch**: Automated timer-based will release mechanism
-- **Death Certificate Verification**: OCR-based verification of death certificates before will release
-- **Smart Contract Security**: Ethereum blockchain-based access control and automation
-- **Beneficiary Management**: Designate and manage will beneficiaries
-- **Check-In System**: Regular owner check-ins to prevent premature will release
+- **Smart Contract Architecture** — Factory pattern (`WillRegistry` → `WillLocker`) with per-will isolation
+- **Dead Man's Switch** — Timer-based will release with configurable check-in intervals and grace periods
+- **Client-Side Encryption** — PBKDF2 + AES-GCM 256-bit encryption before IPFS upload
+- **Decentralized Storage** — Encrypted documents pinned to IPFS via Pinata, CID managed on-chain
+- **Death Certificate Verification** — OCR-based validation with SHA-256 integrity hashing and on-chain verification state
+- **Chainlink Automation-Compatible** — `checkUpkeep()` / `performUpkeep()` upkeep logic for automated monitoring
+- **MetaMask Integration** — Wallet connectivity via ethers.js BrowserProvider
 
-### Technical Features
-- **OCR Processing**: Tesseract.js-based death certificate text extraction
-- **Certificate Validation**: Keyword-based validation for death certificate authenticity
-- **Hash Verification**: SHA-256 hashing for certificate integrity
-- **Chainlink Automation Ready**: Compatible with Chainlink Keepers for automated upkeep
-- **MetaMask Integration**: Seamless wallet connectivity
+## Architecture
 
-## 🏗️ Architecture
-
-### Smart Contracts
-- **WillRegistry.sol**: Factory contract for creating and managing will lockers
-- **WillLocker.sol**: Individual will locker with death certificate verification
-  - Owner check-in mechanism
-  - Grace period management
-  - Certificate submission and verification
-  - Automated claim process
-
-### Backend (Node.js/Express)
-- **IPFS Integration**: File upload to Pinata
-- **OCR Processing**: Death certificate text extraction using Tesseract.js
-- **Certificate Validation**: Keyword-based death certificate verification
-- **Hash Generation**: SHA-256 certificate hashing
-
-### Frontend (React + Vite)
-- **React Components**: Modern component-based UI
-- **Ethers.js**: Blockchain interaction
-- **CryptoJS**: Client-side encryption/decryption
-- **Responsive Design**: Mobile-friendly interface
-
-## 📋 Prerequisites
-
-- **Node.js** (v16 or higher)
-- **MetaMask** browser extension
-- **Git** (optional, for cloning)
-
-## 🚀 Installation
-
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd decentralized-will
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│   React/Vite    │     │  Node.js/Express  │     │    IPFS / Pinata    │
+│   Frontend      │────▶│    Backend        │────▶│  Decentralized      │
+│                 │     │                   │     │  Storage            │
+│ • MetaMask      │     │ • Multer          │     │                     │
+│ • ethers.js     │     │ • Tesseract.js    │     │ Encrypted files     │
+│ • Web Crypto    │     │ • SHA-256 hashing │     │ pinned with CID     │
+└────────┬────────┘     └───────────────────┘     └─────────────────────┘
+         │
+         │ ethers.js
+         ▼
+┌─────────────────────────────────────────────────┐
+│              Ethereum Blockchain                 │
+│                                                  │
+│  WillRegistry (Factory)                          │
+│    └── createWill() → deploys WillLocker         │
+│                                                  │
+│  WillLocker (Per-Will Contract)                  │
+│    ├── checkIn()              Owner resets timer  │
+│    ├── checkUpkeep()          Automation check    │
+│    ├── performUpkeep()        Emit Unlocked       │
+│    ├── submitDeathCertificate()  Beneficiary      │
+│    ├── verifyDeathCertificate()  Verifier         │
+│    ├── claim()                Beneficiary claims  │
+│    └── getCID()               Access control      │
+└─────────────────────────────────────────────────┘
 ```
 
-### 2. Install Dependencies
+## Smart Contract Design
 
-**Root Dependencies** (Hardhat & Smart Contracts)
+### WillRegistry.sol — Factory Contract
+
+- Deploys individual `WillLocker` contracts per will
+- Maintains `userWills` and `beneficiaryWills` mappings
+- Emits `WillCreated` event with owner and locker addresses
+- Provides `getMyWills()` and `getWillsAsBeneficiary()` view functions
+
+### WillLocker.sol — Individual Will Contract
+
+| Function | Access | Description |
+|----------|--------|-------------|
+| `checkIn()` | Owner only | Resets the Dead Man's Switch timer |
+| `checkUpkeep()` | Public (view) | Returns `true` if interval + grace period has elapsed |
+| `performUpkeep()` | Public | Emits `Unlocked` event when conditions are met |
+| `submitDeathCertificate()` | Beneficiary only | Submits SHA-256 certificate hash after expiry |
+| `verifyDeathCertificate()` | Verifier only | Approves the submitted death certificate |
+| `autoVerifyCertificate()` | Beneficiary only | Combined submit + verify for simplified flow |
+| `claim()` | Beneficiary only | Claims the will after certificate verification |
+| `getCID()` | Public (view) | Returns encrypted document CID after verification |
+
+**Access Control**: Each function enforces `require()` checks for caller identity, timer state, and claim status.
+
+## Demo
+
+### Hardhat Node & Contract Deployment
+![Hardhat local blockchain running with test accounts](screenshots/hardhat-node.png)
+![Smart contract deployment to local network](screenshots/contract-deployment.png)
+
+### Backend & Frontend Servers
+![Express backend running on port 5000](screenshots/backend-server.png)
+![Vite dev server running on port 5173](screenshots/frontend-dev-server.png)
+
+### Application Home Page
+![Decentralized Will Management home page](screenshots/home-page.png)
+
+## How It Works
+
+```
+1. Owner connects MetaMask wallet
+2. Creates a will: uploads PDF → encrypts client-side → uploads to IPFS → stores CID on-chain
+3. Smart contract deploys a WillLocker with beneficiary, check-in interval, and grace period
+4. Owner periodically calls checkIn() to reset the Dead Man's Switch
+5. If owner fails to check in → will becomes claimable after interval + grace period
+6. Beneficiary submits death certificate → backend performs OCR → validates keywords
+7. Certificate SHA-256 hash is submitted to the smart contract
+8. After verification, beneficiary calls claim() and retrieves the encrypted CID
+9. Beneficiary decrypts the document with the owner's password
+```
+
+## Technology Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Blockchain** | Solidity ^0.8.20, Hardhat ^2.26.0, ethers.js ^6.15.0, Chainlink Contracts ^1.5.0 |
+| **Frontend** | React ^18.x, Vite, Tailwind CSS, Web Crypto API (PBKDF2 + AES-GCM) |
+| **Backend** | Node.js, Express.js, Tesseract.js (OCR), Pinata SDK (IPFS) |
+| **Testing** | Mocha, Chai, Hardhat Network Helpers |
+
+## Project Structure
+
+```
+decentralized-will-management/
+├── contracts/                    # Solidity smart contracts
+│   ├── WillRegistry.sol          # Factory contract
+│   └── WillLocker.sol            # Individual will locker
+├── test/                         # Smart contract tests
+│   └── WillManagement.test.js    # 27 tests covering all contract functions
+├── scripts/                      # Deployment and testing scripts
+│   ├── deployLocal.js            # Local Hardhat deployment
+│   ├── debugLocal.js             # Blockchain time manipulation
+│   ├── testDeadmanSwitch.js      # Dead Man's Switch test flow
+│   ├── testCertificateVerification.js  # Certificate verification test
+│   ├── createWillLocal.js        # Will creation script
+│   ├── claimWillLocal.js         # Will claiming script
+│   └── uploadToPinata.js         # Direct IPFS upload
+├── backend/                      # Express.js server
+│   ├── server.js                 # API routes (upload, certificate processing)
+│   └── certificateProcessor.js   # OCR + validation + SHA-256 hashing
+├── frontend/                     # React application
+│   ├── src/
+│   │   ├── components/           # React components
+│   │   │   ├── CreateWill.jsx    # Will creation form
+│   │   │   ├── ViewWill.jsx      # Will viewer + Dead Man's Switch
+│   │   │   ├── ConnectWallet.jsx # MetaMask integration
+│   │   │   ├── DeathCertificateUpload.jsx  # Certificate upload + OCR
+│   │   │   └── Home.jsx          # Landing page
+│   │   ├── utils/
+│   │   │   ├── crypto.js         # PBKDF2 + AES-GCM encryption/decryption
+│   │   │   ├── blockchain.js     # ethers.js provider setup
+│   │   │   └── ipfs.js           # IPFS gateway utilities
+│   │   └── contracts/            # Contract ABIs
+│   └── vite.config.js
+├── screenshots/                  # Application demo screenshots
+└── hardhat.config.js             # Hardhat configuration
+```
+
+## Getting Started
+
+### Prerequisites
+- Node.js v16+
+- MetaMask browser extension
+
+### Installation
+
 ```bash
+# Clone the repository
+git clone https://github.com/PavanKunthe/decentralized-will-management.git
+cd decentralized-will-management
+
+# Install root dependencies (Hardhat & smart contracts)
 npm install
+
+# Install backend dependencies
+cd backend && npm install && cd ..
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
 ```
 
-**Backend Dependencies**
-```bash
-cd backend
-npm install
-cd ..
+### Environment Configuration
+
+Create `backend/.env`:
 ```
-
-**Frontend Dependencies**
-```bash
-cd frontend
-npm install
-cd ..
-```
-
-### 3. Environment Configuration
-
-**Backend `.env`** (backend/.env)
-```env
 PINATA_API_KEY=your_pinata_api_key
 PINATA_SECRET_API_KEY=your_pinata_secret_key
 PORT=5000
 ```
 
-**Root `.env`** (for deployment)
-```env
-PRIVATE_KEY=your_private_key
-INFURA_API_KEY=your_infura_key (for testnet deployment)
-```
+### Running Locally
 
-## 🎮 Running the Project
+You need three terminals:
 
-You need **three separate terminals** running simultaneously:
-
-### Terminal 1: Local Blockchain Node
+**Terminal 1 — Local Blockchain**
 ```bash
 npx hardhat node
 ```
-*Starts local Ethereum network on localhost:8545. Keep this running and note the test accounts.*
 
-### Terminal 2: Backend Server
+**Terminal 2 — Backend Server**
 ```bash
-cd backend
-npm start
+cd backend && npm start
 ```
-*Starts Express server on http://localhost:5000 for IPFS uploads and OCR processing.*
 
-### Terminal 3: Deploy Contracts & Start Frontend
-
-**Deploy Smart Contracts**
+**Terminal 3 — Deploy & Start Frontend**
 ```bash
 npx hardhat run scripts/deployLocal.js --network localhost
+cd frontend && npm run dev
 ```
-*Deploys WillRegistry contract and saves address to frontend configuration.*
 
-**Start Frontend**
+### MetaMask Setup
+1. Switch network to Localhost 8545
+2. Import test accounts from Terminal 1 (copy private keys)
+3. Import at least 2 accounts: Owner and Beneficiary
+
+## Testing
+
+Run the smart contract test suite:
+
 ```bash
-cd frontend
-npm run dev
-```
-*Launches React app at http://localhost:5173*
-
-## 📖 Usage Guide
-
-### Initial Setup
-
-1. **Configure MetaMask**
-   - Switch network to **Localhost 8545**
-   - Import test accounts from Terminal 1 (copy private keys)
-   - Import at least 2 accounts: one for Owner, one for Beneficiary
-
-### Creating a Will
-
-1. Navigate to **"Create Will"**
-2. Upload a PDF document (your will)
-3. Enter an encryption password (remember this!)
-4. Enter beneficiary's wallet address
-5. Set check-in interval (e.g., 60 seconds for testing, days/months for production)
-6. Confirm transaction in MetaMask
-7. Wait for blockchain confirmation
-
-### Owner Actions
-
-1. Go to **"View Will"**
-2. Click **"Get My Locker"**
-3. View countdown timer
-4. Click **"I'm Alive (Reset Timer)"** to reset the countdown
-5. Repeat check-ins before timer expires
-
-### Beneficiary Claiming Process
-
-#### Step 1: Wait for Expiration
-- Timer must expire (owner fails to check in)
-- On local blockchain, time advances with transactions
-- Use debug script if needed:
-  ```bash
-  npx hardhat run scripts/debugLocal.js --network localhost
-  ```
-
-#### Step 2: Submit Death Certificate
-1. Switch to **Beneficiary account** in MetaMask
-2. Navigate to **"View Will"**
-3. Click **"Get My Locker"**
-4. Upload death certificate image (JPG/PNG)
-5. System performs OCR and validation
-6. Certificate hash is submitted to blockchain
-
-#### Step 3: Claim Will
-1. After certificate verification, click **"Claim Will"**
-2. Confirm transaction in MetaMask
-3. Click **"Load CID"** to retrieve encrypted will
-4. Click **"Decrypt & View Will"**
-5. Enter owner's password to decrypt and download PDF
-
-## 🧪 Testing
-
-### Automated Testing Scripts
-
-**Test Certificate Verification Flow**
-```bash
-npx hardhat run scripts/testCertificateVerification.js --network localhost
-```
-*Tests the complete death certificate verification and claim process.*
-
-**Backend Certificate Processing Test**
-```bash
-node test-backend-certificate.js
-```
-*Tests OCR processing and certificate validation.*
-
-**Quick Backend Test** (Windows)
-```bash
-test-backend.bat
+npx hardhat test
 ```
 
-### Manual Testing Workflow
+The test suite covers 27 test cases including:
+- Registry deployment and will creation
+- Owner check-in and access control
+- Dead Man's Switch expiration logic
+- `checkUpkeep()` / `performUpkeep()` automation
+- Death certificate submission and verification
+- Claim restrictions and CID access control
 
-1. **Create Test Will**
-   - Use 60-second check-in interval
-   - Note the locker address
+## Security Considerations
 
-2. **Let Timer Expire**
-   - Wait 60+ seconds
-   - Run debug script to advance blockchain time if needed
+- **Encryption**: Client-side AES-GCM 256-bit encryption with PBKDF2 key derivation (100,000 iterations, random salt)
+- **Access Control**: Smart contract `require()` checks enforce owner/beneficiary restrictions on every function
+- **Certificate Integrity**: SHA-256 hashing prevents certificate tampering
+- **Grace Period**: Configurable grace period prevents accidental will releases
+- **CID Protection**: `getCID()` requires both timer expiry and certificate verification
 
-3. **Test Certificate Upload**
-   - Create/use test death certificate image
-   - Upload as beneficiary
-   - Verify OCR extraction
+> **Note**: The `autoVerifyCertificate()` function provides a simplified verification flow. In production, certificate verification should involve independent trusted verifiers or oracle-based validation. Chainlink Automation integration is compatible but not deployed to a live keeper network.
 
-4. **Complete Claim**
-   - Claim will after verification
-   - Decrypt with owner's password
-   - Verify PDF download
+⚠️ **Never commit private keys or API keys to version control.**
 
-## 🛠️ Technology Stack
+## Acknowledgments
 
-### Blockchain
-- **Solidity** ^0.8.20 - Smart contract development
-- **Hardhat** ^2.26.0 - Development environment
-- **Ethers.js** ^6.15.0 - Blockchain interaction
-- **Chainlink Contracts** ^1.5.0 - Automation compatibility
+- [Hardhat](https://hardhat.org/) — Ethereum development environment
+- [OpenZeppelin](https://www.openzeppelin.com/) — Smart contract standards
+- [Chainlink](https://chain.link/) — Automation infrastructure
+- [Pinata](https://www.pinata.cloud/) — IPFS pinning service
+- [Tesseract.js](https://tesseract.projectnaptha.com/) — OCR processing
 
-### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web server framework
-- **Tesseract.js** - OCR processing
-- **Pinata SDK** - IPFS file storage
-- **Crypto** - SHA-256 hashing
+## License
 
-### Frontend
-- **React** ^18.x - UI framework
-- **Vite** - Build tool and dev server
-- **CryptoJS** - Encryption/decryption
-- **Ethers.js** - Web3 integration
-
-### Development Tools
-- **Mocha** - Testing framework
-- **Chai** - Assertion library
-- **TypeScript** - Type safety
-- **Prettier** - Code formatting
-
-## 📁 Project Structure
-
-```
-decentralized-will/
-├── contracts/              # Solidity smart contracts
-│   ├── WillRegistry.sol   # Factory contract
-│   └── WillLocker.sol     # Individual will locker
-├── scripts/               # Deployment and test scripts
-│   ├── deployLocal.js     # Local deployment
-│   ├── debugLocal.js      # Time manipulation
-│   └── testCertificateVerification.js
-├── backend/               # Express server
-│   ├── server.js          # Main server file
-│   ├── certificateProcessor.js  # OCR processing
-│   └── uploads/           # Temporary file storage
-├── frontend/              # React application
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── utils/         # Helper functions
-│   │   └── contracts/     # Contract ABIs
-│   └── public/
-├── test/                  # Contract tests
-└── hardhat.config.js      # Hardhat configuration
-```
-
-## 🔐 Security Considerations
-
-- **Encryption**: Client-side AES encryption for will documents
-- **Access Control**: Smart contract-enforced beneficiary restrictions
-- **Certificate Verification**: Multi-keyword validation for death certificates
-- **Hash Integrity**: SHA-256 hashing prevents certificate tampering
-- **Grace Period**: Configurable grace period prevents accidental releases
-- **Private Keys**: Never commit private keys or API keys to version control
-
-## 🐛 Troubleshooting
-
-### Timer Not Advancing
-**Issue**: Countdown timer stuck on local blockchain  
-**Solution**: Run the debug script to advance blockchain time:
-```bash
-npx hardhat run scripts/debugLocal.js --network localhost
-```
-
-### MetaMask Transaction Fails
-**Issue**: Transaction rejected or fails  
-**Solutions**:
-- Ensure correct network (Localhost 8545)
-- Check account has sufficient ETH
-- Reset MetaMask account nonce (Settings → Advanced → Reset Account)
-
-### OCR Not Working
-**Issue**: Death certificate not recognized  
-**Solutions**:
-- Use clear, high-quality images
-- Ensure certificate contains keywords: "death", "certificate", "deceased"
-- Check backend logs for OCR errors
-
-### IPFS Upload Fails
-**Issue**: File upload to Pinata fails  
-**Solutions**:
-- Verify Pinata API keys in backend/.env
-- Check internet connection
-- Ensure file size is within limits
-
-## 📝 Development Notes
-
-### Local Blockchain Time
-- Time only advances with transactions
-- Use `debugLocal.js` to fast-forward time
-- Check-in intervals should be short for testing (60-300 seconds)
-
-### Testing with Real Networks
-- Update `hardhat.config.js` with network details
-- Use testnet faucets for test ETH
-- Update frontend contract addresses after deployment
-
-### Certificate Verification
-- OCR requires clear, readable text
-- Validation checks for specific keywords
-- Auto-verify function available for testing (bypasses manual verification)
-
-## 🙏 Acknowledgments
-
-- **Hardhat** - Ethereum development environment
-- **OpenZeppelin** - Smart contract libraries
-- **Chainlink** - Automation infrastructure
-- **Pinata** - IPFS pinning service
-- **Tesseract.js** - OCR processing
+ISC
