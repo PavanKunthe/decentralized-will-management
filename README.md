@@ -69,11 +69,20 @@ A decentralized digital inheritance system built on Ethereum that enables secure
 
 ## Demo
 
-### Hardhat Node & Contract Deployment
+### Create Will — Encrypt & Upload to IPFS
+![Create Will form with encryption and IPFS upload](screenshots/create-will-upload.png)
+![Will creation with CID, beneficiary address, and check-in interval](screenshots/create-will-form.png)
+
+### IPFS Storage (Pinata)
+![Encrypted file stored on Pinata IPFS](screenshots/pinata-ipfs-storage.png)
+![Backend receiving encrypted file and uploading to Pinata](screenshots/backend-ipfs-upload.png)
+
+### Dead Man's Switch — Countdown Timer
+![Dead Man's Switch with countdown timer and locker details](screenshots/deadman-switch.png)
+
+### Infrastructure — Local Development
 ![Hardhat local blockchain running with test accounts](screenshots/hardhat-node.png)
 ![Smart contract deployment to local network](screenshots/contract-deployment.png)
-
-### Backend & Frontend Servers
 ![Express backend running on port 5000](screenshots/backend-server.png)
 ![Vite dev server running on port 5173](screenshots/frontend-dev-server.png)
 
